@@ -14,9 +14,10 @@ from typing import Type
 import json
 import aiohttp
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
-from mautrix.types import RoomID
-from maubot import MessageEvent, Plugin
-from maubot.handlers import event, command
+from mautrix.types import EventID, RoomID
+from maubot.handlers import command
+from maubot.matrix import MaubotMessageEvent
+from maubot.plugin_base import Plugin
 from .languages import LANGUAGES
 
 
@@ -48,14 +49,15 @@ class OpenAITranslate(Plugin):
         Ensures that the OpenAI API token is configured. Logs a warning if not.
         """
         await super().start()
+        if not self.config:
+            raise ValueError("Plugin must be configured before use.")
         self.config.load_and_update()
-
         if not self.config["openai.api_key"]:
-            self.log.warning("OpenAI API token is not configured.")
+            raise ValueError("OpenAI API token is not configured.")
 
     @command.new("tr", help="Translates a message")
     @command.argument("language", pass_raw=True, required=False)
-    async def handle_translate(self, event: MessageEvent, language: str) -> None:
+    async def handle_translate(self, event: MaubotMessageEvent, language: str) -> None:
         """
         Handles the '!tr' command to translate a message in a Matrix room.
 
@@ -90,7 +92,7 @@ class OpenAITranslate(Plugin):
 
         await event.respond(translation)
 
-    async def extract_reply(self, room_id: RoomID, event_id: str) -> str:
+    async def extract_reply(self, room_id: RoomID, event_id: EventID) -> str:
         """
         Extracts the content of a message being replied to in a Matrix room.
 

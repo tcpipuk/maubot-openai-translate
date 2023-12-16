@@ -50,10 +50,12 @@ class OpenAITranslate(Plugin):
         """
         await super().start()
         if not self.config:
-            raise ValueError("Plugin must be configured before use.")
+            self.log.error("Plugin must be configured before use.")
+            await self.stop()
         self.config.load_and_update()
         if not self.config["openai.api_key"]:
-            raise ValueError("OpenAI API token is not configured.")
+            self.log.error("OpenAI API token is not configured.")
+            await self.stop()
 
     @command.new("tr", help="Translates a message")
     @command.argument("language", pass_raw=True, required=False)
@@ -87,7 +89,9 @@ class OpenAITranslate(Plugin):
         else:
             return
 
+        self.log.info(f"Requested to translate into {language_name}: {original_message}")
         translation = await self.translate_with_openai(original_message, language)
+        self.log.info(f"Received translation: {translation}")
         await event.respond(translation)
 
     async def extract_reply(self, room_id: RoomID, event_id: EventID) -> str:
@@ -136,6 +140,7 @@ class OpenAITranslate(Plugin):
             "presence_penalty": 0,
         }
 
+        self.log.info(f"Sending payload to OpenAI: {json.dumps(payload)}")
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
@@ -145,6 +150,7 @@ class OpenAITranslate(Plugin):
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
+                        self.log.info(f"Response from OpenAI: {json.dumps(data)}")
                         responses = (
                             data.get("choices", [{}])[0]
                             .get("message", {})

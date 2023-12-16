@@ -126,18 +126,18 @@ class OpenAITranslate(Plugin):
             return "Sorry, I'm not configured yet!"
         # Build request
         headers = {
-            "Authorization": f"Bearer {self.config['openai_key']}",
+            "Authorization": f"Bearer {self.config['openai.api_key']}",
             "Content-Type": "application/json",
         }
         prompt = self.config["openai.prompt"].format(language=language) + text
         payload = {
-            "model": self.config["openai_model"],
+            "model": self.config["openai.model"],
             "messages": [
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": text},
             ],
-            "temperature": self.config["openai_temperature"],
-            "max_tokens": self.config["openai_max_tokens"],
+            "temperature": self.config["openai.temperature"],
+            "max_tokens": self.config["openai.max_tokens"],
             "top_p": 1,
             "frequency_penalty": 0,
             "presence_penalty": 0,

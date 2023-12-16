@@ -87,9 +87,7 @@ class OpenAITranslate(Plugin):
         else:
             return
 
-        formatted_text = f"Language: {language_name}\nMessage: {original_message}"
-        translation = await self.translate_with_openai(formatted_text, language)
-
+        translation = await self.translate_with_openai(original_message, language)
         await event.respond(translation)
 
     async def extract_reply(self, room_id: RoomID, event_id: EventID) -> str:
@@ -124,13 +122,11 @@ class OpenAITranslate(Plugin):
             "Authorization": f"Bearer {self.config['openai_key']}",
             "Content-Type": "application/json",
         }
+        prompt = self.config["openai.prompt"].format(language=language) + text
         payload = {
             "model": self.config["openai_model"],
             "messages": [
-                {
-                    "role": "system",
-                    "content": self.config["openai_prompt"].format(language=language),
-                },
+                {"role": "system", "content": prompt},
                 {"role": "user", "content": text},
             ],
             "temperature": self.config["openai_temperature"],
@@ -140,21 +136,28 @@ class OpenAITranslate(Plugin):
             "presence_penalty": 0,
         }
 
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                data=json.dumps(payload),
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    responses = (
-                        data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-                    )
-                    return responses
-                else:
-                    self.log.error(f"OpenAI API request failed with status {resp.status}")
-                    return "Failed to translate the message."
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    data=json.dumps(payload),
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        responses = (
+                            data.get("choices", [{}])[0]
+                            .get("message", {})
+                            .get("content", "")
+                            .strip()
+                        )
+                        return responses
+                    else:
+                        self.log.error(f"OpenAI API request failed with status {resp.status}")
+                        return "Failed to translate the message."
+        except Exception as e:
+            self.log.error(f"Error during translation: {e}")
+            return "Failed to translate the message due to an error."
 
     @classmethod
     def get_config_class(cls) -> Type[BaseProxyConfig]:

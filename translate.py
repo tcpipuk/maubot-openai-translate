@@ -6,12 +6,16 @@ from maubot.handlers import command
 from mautrix.types import RoomID
 from .languages import LANGUAGES
 
+
 class Config(maubot.Config):
     openai_key: str
     openai_model: str = "gpt-3.5-turbo"
     openai_max_tokens: int = 2048
     openai_temperature: float = 0.4
-    openai_prompt: str = "Translate the following message to {language}. Write nothing except the translation."
+    openai_prompt: str = (
+        "Translate the following message to {language}. Write nothing except the translation."
+    )
+
 
 class OpenAITranslate(Plugin):
     async def start(self) -> None:
@@ -30,9 +34,11 @@ class OpenAITranslate(Plugin):
             return
 
         if event.content.relates_to and event.content.relates_to.rel_type == "m.in_reply_to":
-            original_message = await self.extract_reply(event.room_id, event.content.relates_to.event_id)
+            original_message = await self.extract_reply(
+                event.room_id, event.content.relates_to.event_id
+            )
         elif language and event.content.body.strip() != "!tr " + language:
-            original_message = event.content.body.split(' ', 2)[2]
+            original_message = event.content.body.split(" ", 2)[2]
         else:
             return
 
@@ -47,37 +53,38 @@ class OpenAITranslate(Plugin):
 
     async def translate_with_openai(self, text: str, language: str) -> str:
         headers = {
-            'Authorization': f'Bearer {self.config.openai_key}',
-            'Content-Type': 'application/json'
+            "Authorization": f"Bearer {self.config.openai_key}",
+            "Content-Type": "application/json",
         }
         payload = {
-            'model': self.config.openai_model,
-            'messages': [
-                {
-                    "role": "system",
-                    "content": self.config.openai_prompt.format(language=language)
-                },
-                {
-                    "role": "user",
-                    "content": text
-                }
+            "model": self.config.openai_model,
+            "messages": [
+                {"role": "system", "content": self.config.openai_prompt.format(language=language)},
+                {"role": "user", "content": text},
             ],
-            'temperature': self.config.openai_temperature,
-            'max_tokens': self.config.openai_max_tokens,
-            'top_p': 1,
-            'frequency_penalty': 0,
-            'presence_penalty': 0
+            "temperature": self.config.openai_temperature,
+            "max_tokens": self.config.openai_max_tokens,
+            "top_p": 1,
+            "frequency_penalty": 0,
+            "presence_penalty": 0,
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post('https://api.openai.com/v1/chat/completions', headers=headers, data=json.dumps(payload)) as resp:
+            async with session.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                data=json.dumps(payload),
+            ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
-                    responses = data.get('choices', [{}])[0].get('message', {}).get('content', '').strip()
+                    responses = (
+                        data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    )
                     return responses
                 else:
                     self.log.error(f"OpenAI API request failed with status {resp.status}")
                     return "Failed to translate the message."
+
 
 def get_class():
     return OpenAITranslate

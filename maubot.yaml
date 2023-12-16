@@ -3,5 +3,5 @@ id: uk.tcpip.openai.translate
 version: 0.0.1
 license: AGPLv3
 modules:
-- translate
+  - translate
 main_class: OpenAITranslate

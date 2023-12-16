@@ -1,3 +1,14 @@
+"""
+languages.py
+
+This file contains a dictionary named LANGUAGES, which maps ISO 639-1 two-letter language codes to
+their corresponding full language names.
+
+This mapping is used by the OpenAITranslate Maubot plugin to translate language codes into
+human-readable language names for display and API interaction purposes.
+
+Note: Ensure that the language codes are in lowercase!
+"""
 LANGUAGES = {
     "ab": "Abkhaz",
     "aa": "Afar",
@@ -182,5 +193,5 @@ LANGUAGES = {
     "yi": "Yiddish",
     "yo": "Yoruba",
     "za": "Zhuang",
-    "zu": "Zulu"
+    "zu": "Zulu",
 }

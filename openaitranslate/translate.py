@@ -14,10 +14,16 @@ from typing import Type
 import json
 import aiohttp
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
-from mautrix.types import EventID, RoomID
+from mautrix.types import (
+    EventID,
+    MessageType,
+    RelatesTo,
+    RelationType,
+    RoomID,
+    TextMessageEventContent,
+)
+from maubot import MessageEvent, Plugin
 from maubot.handlers import command
-from maubot.matrix import MaubotMessageEvent
-from maubot.plugin_base import Plugin
 from .languages import LANGUAGES
 
 
@@ -49,17 +55,22 @@ class OpenAITranslate(Plugin):
         Ensures that the OpenAI API token is configured. Logs a warning if not.
         """
         await super().start()
-        if not self.config:
+        if not isinstance(self.config, Config):
             self.log.error("Plugin must be configured before use.")
             await self.stop()
-        self.config.load_and_update()
-        if not self.config["openai.api_key"]:
+        elif not self.config["openai.api_key"]:
             self.log.error("OpenAI API token is not configured.")
             await self.stop()
+        else:
+            self.config.load_and_update()
+            self.log.info("OpenAITranslate has started!")
 
-    @command.new("tr", help="Translates a message")
-    @command.argument("language", pass_raw=True, required=False)
-    async def handle_translate(self, event: MaubotMessageEvent, language: str) -> None:
+    @command.new(name="tr", help="Enter `!tr en` to translate to a given language")
+    @command.argument("language", pass_raw=True, required=True)
+    @command.argument("message", pass_raw=True, required=False)
+    async def handle_translate(
+        self, evt: MessageEvent, language: str = "en", message: str | None = None
+    ) -> None:
         """
         Handles the '!tr' command to translate a message in a Matrix room.
 
@@ -71,28 +82,38 @@ class OpenAITranslate(Plugin):
             language (str): The language code to which the message should be translated.
 
         Returns:
-            None: Responds directly to the Matrix room with the translated message or an error message.
+            None: Responds directly to the Matrix room with the translated message or error message.
         """
+        self.log.info("OpenAITranslate received a request!")
         # Convert the language code to language name
         language_name = LANGUAGES.get(language.lower())
 
         if not language_name:
-            await event.respond("Invalid or unsupported language code.")
+            await evt.respond("Invalid or unsupported language code.")
             return
 
-        if event.content.relates_to and event.content.relates_to.rel_type == "m.in_reply_to":
+        if evt.content.relates_to and evt.content.relates_to.rel_type == "m.in_reply_to":
             original_message = await self.extract_reply(
-                event.room_id, event.content.relates_to.event_id
+                evt.room_id, evt.content.relates_to.event_id
             )
-        elif language and event.content.body.strip() != "!tr " + language:
-            original_message = event.content.body.split(" ", 2)[2]
+        elif message:
+            original_message = evt.content.body.split(" ", 2)[2]
         else:
+            self.log.info(f"Couldn't recognise message {original_message}")
             return
 
         self.log.info(f"Requested to translate into {language_name}: {original_message}")
         translation = await self.translate_with_openai(original_message, language)
         self.log.info(f"Received translation: {translation}")
-        await event.respond(translation)
+
+        content = TextMessageEventContent(
+            msgtype=MessageType.TEXT,
+            body=f"From {language_name}: {translation}",
+            relates_to=RelatesTo(
+                rel_type=RelationType("xyz.maubot.translation"), event_id=evt.event_id
+            ),
+        )
+        await evt.respond(content)
 
     async def extract_reply(self, room_id: RoomID, event_id: EventID) -> str:
         """
@@ -105,8 +126,8 @@ class OpenAITranslate(Plugin):
         Returns:
             str: The content of the original message.
         """
-        event = await self.client.get_event(room_id, event_id)
-        return event.content.body if event else ""
+        evt = await self.client.get_event(room_id, event_id)
+        return evt.content.body if evt else ""
 
     async def translate_with_openai(self, text: str, language: str) -> str:
         """

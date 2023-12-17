@@ -3,4 +3,4 @@ openai:
   model: gpt-3.5-turbo
   max_tokens: 2048
   temperature: 0.4
-  prompt: Translate the following message to {language}. Write nothing except the translation.
+  prompt: Translate the following message to {language} in a conversational style. Write nothing else except this translation.

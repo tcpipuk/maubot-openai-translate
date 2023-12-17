@@ -138,7 +138,6 @@ class OpenAITranslate(Plugin):
             "frequency_penalty": 0,
             "presence_penalty": 0,
         }
-        self.log.info(f"Sending this to OpenAI: {json.dumps(payload)}")
         # Send request to OpenAI
         try:
             async with aiohttp.ClientSession() as session:

@@ -1,34 +1,26 @@
-# OpenAI Translate Maubot
+# OpenAI Translate Maubot Plugin
 
-A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin leveraging OpenAI's translation capabilities. This bot translates messages into a wide range of languages, supporting quick and accurate communication across language barriers.
+A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin that uses OpenAI's GPT models to provide quick and accurate translations in a more natural style than traditional translation services.
 
-## Features
+## Usage Instructions
 
-- **Translation:** Utilizes OpenAI's advanced language models for accurate translations.
-- **Multiple Languages:** Supports a comprehensive list of languages as defined in the `languages.py` file.
-- **Easy-to-Use:** Simple commands for quick translations within Matrix rooms.
-
-## Usage
-
-- **Translation Command:** `!tr <language_code> <message>`
-  - Translates the `<message>` into the specified `<language_code>`.
-  - Example: `!tr fr Hello World` translates "Hello World" into French.
-- **Reply Translation:** Reply to a message with `!tr <language_code>`
-  - The bot will translate the replied-to message into the specified language.
-  - Example: Replying to a message with `!tr es` translates the original message into Spanish.
+- **Direct Translation:** Use `!tr <language_code> <message>` to translate a specific message.
+  - Example: `!tr fr Hello World` will translate "Hello World" into French.
+- **Reply Translation:** Reply to an existing message with `!tr <language_code>`, and the bot will reply to the same message in the chosen language.
+  - Example: Replying with `!tr de` to a message will translate it into German.
 
 ## Supported Languages
 
-The bot supports a variety of languages, each identified by a unique language code. Refer to the `languages.py` file for the full list of supported languages and their corresponding codes.
+A comprehensive list of supported languages and their respective ISO 639-1 two-letter codes can be found in the `languages.py` file. This includes widely spoken languages like English, Spanish, French, as well as less commonly used languages, providing broad accessibility.
 
-## Configuration
+## Configuration and Setup
 
-To use this plugin:
+- **Prerequisites:** An active OpenAI API token is required for the bot's operation.
+- **Configuration:** Enter your OpenAI credentials in the Instance tab in Maubot and tweak the other OpenAI values according to your needs.
+- **Deployment:** Deploy the bot in your Matrix rooms to start enjoying seamless translation services.
 
-1. Ensure you have an OpenAI API token.
-2. Set up the bot with the required OpenAI credentials in `maubot.yaml`.
-3. Deploy the bot in your Matrix environment.
+**Note: OpenAI's API costs money. Make sure to set a spending limit in your OpenAI account, and monitor usage to avoid any surprises.**
 
 ## License
 
-This bot is distributed under the AGPLv3 license. See the `LICENSE` file for more details.
+The OpenAI Translate Maubot is distributed under the AGPLv3 license. Please refer to the `LICENSE` file for detailed licensing information.

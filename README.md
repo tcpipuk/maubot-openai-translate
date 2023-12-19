@@ -1,6 +1,8 @@
 # OpenAI Translate Maubot Plugin
 
-A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin that uses OpenAI's GPT models to provide quick and accurate translations in a more natural style than traditional translation services.
+A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin that uses OpenAI's GPT models to provide quick and accurate translations for [Matrix](https://matrix.org/docs/chat_basics/matrix-for-im/) chat rooms.
+
+OpenAI's GPT models cost money to query, however even the cheapest models typically excel at translation, not only better replicating the tone/style of the original, but also understanding the context, so the translation more accurately maintains the spirit of the original too.
 
 ## Usage Instructions
 
@@ -17,7 +19,12 @@ A comprehensive list of supported languages and their respective ISO 639-1 two-l
 
 - **Prerequisites:** An active OpenAI API token is required for the bot's operation.
 - **Configuration:** Enter your OpenAI credentials in the Instance tab in Maubot and tweak the other OpenAI values according to your needs.
-- **Deployment:** Deploy the bot in your Matrix rooms to start enjoying seamless translation services.
+  - `openai.api_key`: Your API key for accessing OpenAI's services, the bot will not work without it.
+  - `openai.model`: GPT model used for translations, the default is `gpt-3.5-turbo`.
+  - `openai.max_tokens`: Provides an upper limit for translation length by setting the maximum number of tokens (words/pieces of words) in each response.
+  - `openai.temperature`: Determines the 'creativity' level of translations. A lower temperature (like the default 0.4) ensures more literal translations.
+  - `openai.prompt`: System prompt sent to OpenAI. The default is simple and reliable, but you may wish to modify it for your own needs.
+- **Deployment:** Deploy the bot in your Matrix rooms, job done!
 
 **Note: OpenAI's API costs money. Make sure to set a spending limit in your OpenAI account, and monitor usage to avoid any surprises.**
 

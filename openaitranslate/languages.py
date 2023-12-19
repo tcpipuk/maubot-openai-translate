@@ -1,8 +1,6 @@
 """
-languages.py
-
-This file contains a dictionary named LANGUAGES, which maps ISO 639-1 two-letter language codes to
-their corresponding full language names.
+This file contains a dictionary that maps ISO 639-1 two-letter language codes to their
+corresponding full language names.
 
 This mapping is used by the OpenAITranslate Maubot plugin to translate language codes into
 human-readable language names for display and API interaction purposes.

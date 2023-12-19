@@ -13,7 +13,7 @@ OpenAI's GPT models incur a cost for queries, however even the cheapest models c
 
 ## Supported Languages
 
-The plugin supports a wide array of languages, listed in the `languages.py` file with their respective ISO 639-1 two-letter codes. This expansive list includes commonly spoken languages like English, Spanish, French, as well as lesser-known ones, and you could customise to additional custom ones if required.
+The plugin supports a wide array of languages, listed in the `languages.py` file with their respective ISO 639-1 two-letter codes. This expansive list includes commonly spoken languages like English, Spanish, French, as well as lesser-known ones, and you could customise to additional custom ones if required - I've added some IETF languages (e.g. `en-gb`, `fr-ca`, `pt-br`) to demonstrate how language variants can be added.
 
 ## Configuration and Setup
 

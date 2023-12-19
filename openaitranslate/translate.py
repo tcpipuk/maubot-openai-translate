@@ -142,7 +142,27 @@ class OpenAITranslate(Plugin):
             )
         return
 
-    async def check_limit(self, user_id):
+    async def check_limit(self, user_id: str) -> bool:
+        """
+        Checks if a user has exceeded the rate limit for translation requests.
+
+        Manages rate limiting by tracking the time of each user's translation requests over a
+        specified time window, defined in the bot's configuration.
+
+        Maintains dictionary (`user_translations`) where each key is a user ID, and value is a list
+        of timestamps representing their translation requests. It removes timestamps outside the
+        current rate limit window and checks if the number of requests is within the allowed limit.
+        If the user has not exceeded the limit, their new request timestamp is added to the list.
+
+        Args:
+            user_id (str): The unique identifier of the user making the translation request.
+
+        Returns:
+            bool: True if the user can make a translation request,
+                  False if the user has exceeded the rate limit.
+
+        Note: When the rate limiting is set to zero in the config, this always returns True.
+        """
         current_time = datetime.now()
         # Remove expired entries before counting ratelimit
         self.user_translations = {
@@ -154,13 +174,18 @@ class OpenAITranslate(Plugin):
             for user, times in self.user_translations.items()
             if times  # Keep users who have made translations
         }
-        # Check limit for this user
+        # Skip processing if no rate limit
+        if int(self.config["bot.rate_limit"]) == 0:
+            return True
+        # Create entry if this user not seen before
         if user_id not in self.user_translations:
             self.user_translations[user_id] = [current_time]
             return True
-        elif len(self.user_translations[user_id]) <= self.config["bot.rate_limit"]:
+        # Add new timestmap for user if already exists
+        if len(self.user_translations[user_id]) < int(self.config["bot.rate_limit"]):
             self.user_translations[user_id].append(current_time)
             return True
+        # Failed ratelimit check
         else:
             return False
 

@@ -11,6 +11,7 @@ Dependencies:
 - mautrix: For types and utilities related to the Matrix protocol.
 """
 from typing import Type
+from datetime import datetime, timedelta
 import json
 import aiohttp
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
@@ -21,7 +22,32 @@ from .languages import LANGUAGES
 
 
 class Config(BaseProxyConfig):
+    """
+    Extends the BaseProxyConfig from the Maubot framework to manage the configuration settings
+    for the OpenAITranslate plugin. Uses the config parameters from the 'base-config.yaml' file.
+
+    Configuration Parameters:
+        bot.rate_limit (int): Limit on translations each user can do per hour, zero disables limit.
+        bot.rate_window (int): Seconds to ratelimit over, default 3600 for 1 hour.
+        bot.rate_message (str): Message to reply with when limit exceeded (blank means no reply)
+        openai.api_key (str): The API key for accessing OpenAI's services.
+        openai.model (str): Specifies model of GPT (e.g., gpt-3.5-turbo) to use for translations.
+        openai.max_tokens (int): Provides an upper limit for translation length by setting the
+                                 maximum number of tokens (words/pieces of words) in each response.
+        openai.temperature (float): Sets 'creativity' temperature for translation, which should be
+                                    low for a normal translation.
+        openai.prompt (str): System prompt sent to OpenAI, tells the model what to do with the text.
+
+    Methods:
+        do_update(helper: ConfigUpdateHelper): Updates config parameters from the Maubot interface.
+    """
+
     def do_update(self, helper: ConfigUpdateHelper) -> None:
+        helper.copy("bot.rate_limit")
+        helper.copy("bot.rate_window")
+        helper.copy("bot.rate_message")
+        helper.copy("bot.empty_message")
+        helper.copy("bot.unknown_message")
         helper.copy("openai.api_key")
         helper.copy("openai.model")
         helper.copy("openai.max_tokens")
@@ -39,7 +65,10 @@ class OpenAITranslate(Plugin):
 
     Attributes:
         config (Config): A configuration object holding API keys and settings.
+        user_translations (dict): Dict of timestamps of translations for rate limiting.
     """
+
+    user_translations = {}
 
     async def start(self) -> None:
         """
@@ -76,31 +105,89 @@ class OpenAITranslate(Plugin):
         Returns:
             None: Responds directly to the Matrix room with the translated message or error message.
         """
+        reply_config = {"markdown": True, "reply": True}
         # Identify language
         parts = args.split(" ", 1)
         language_code, message = parts[0], parts[1] if len(parts) > 1 else None
         language_name = LANGUAGES.get(language_code.lower())
         if not language_name:
-            await evt.respond(f"I don't recognise language '{language_code}', sorry!", reply=True)
-            return
-        # Handle command replying to original message
-        if message:
-            translation = await self.translate_with_openai(message, language_code)
-            await evt.respond(content=translation, markdown=True, reply=True)
-        elif not message and evt.content.get_reply_to():
-            reply_evt = await self.client.get_event(evt.room_id, evt.content.get_reply_to())
-            translation = await self.translate_with_openai(reply_evt.content.body, language_name)
-            await reply_evt.respond(
-                content=f"{language_code.upper()}: {translation}", markdown=True, reply=True
+            await evt.respond(
+                self.config["bot.unknown_message"].format(language_code=language_code),
+                **reply_config,
             )
+            return
+        # Handle commands that were replying to other messages
+        if not message and evt.content.get_reply_to():
+            reply_evt = await self.client.get_event(evt.room_id, evt.content.get_reply_to())
+            message = reply_evt.content.body
+        else:
+            reply_evt = False
+        # Handle translation replying to original message
+        if message:
+            if not await self.check_limit(evt.sender):
+                if self.config["bot.rate_message"]:
+                    await evt.respond(str(self.config["bot.rate_message"]), **reply_config)
+            else:
+                translation = await self.translate_with_openai(message, language_name)
+                if reply_evt:
+                    await reply_evt.respond(
+                        f"{language_code.upper()}: {translation}", **reply_config
+                    )
+                else:
+                    await evt.respond(translation, **reply_config)
         # Warn when nothing to translate
         else:
             await evt.respond(
-                "I didn't see a message: try using `!tr {language_code}` to reply to it.",
-                markdown=True,
-                reply=True,
+                self.config["bot.empty_message"].format(language_code=language_code), **reply_config
             )
-            return
+        return
+
+    async def check_limit(self, user_id: str) -> bool:
+        """
+        Checks if a user has exceeded the rate limit for translation requests.
+
+        Manages rate limiting by tracking the time of each user's translation requests over a
+        specified time window, defined in the bot's configuration.
+
+        Maintains dictionary (`user_translations`) where each key is a user ID, and value is a list
+        of timestamps representing their translation requests. It removes timestamps outside the
+        current rate limit window and checks if the number of requests is within the allowed limit.
+        If the user has not exceeded the limit, their new request timestamp is added to the list.
+
+        Args:
+            user_id (str): The unique identifier of the user making the translation request.
+
+        Returns:
+            bool: True if the user can make a translation request,
+                  False if the user has exceeded the rate limit.
+
+        Note: When the rate limiting is set to zero in the config, this always returns True.
+        """
+        current_time = datetime.now()
+        # Remove expired entries before counting ratelimit
+        self.user_translations = {
+            user: [
+                t
+                for t in times
+                if current_time - t < timedelta(seconds=self.config["bot.rate_window"])
+            ]
+            for user, times in self.user_translations.items()
+            if times  # Keep users who have made translations
+        }
+        # Skip processing if no rate limit
+        if int(self.config["bot.rate_limit"]) == 0:
+            return True
+        # Create entry if this user not seen before
+        if user_id not in self.user_translations:
+            self.user_translations[user_id] = [current_time]
+            return True
+        # Add new timestmap for user if already exists
+        if len(self.user_translations[user_id]) < int(self.config["bot.rate_limit"]):
+            self.user_translations[user_id].append(current_time)
+            return True
+        # Failed ratelimit check
+        else:
+            return False
 
     async def translate_with_openai(self, text: str, language: str) -> str:
         """

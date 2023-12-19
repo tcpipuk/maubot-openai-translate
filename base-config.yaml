@@ -1,3 +1,9 @@
+bot:
+  rate_limit: 5
+  rate_window: 3600
+  rate_message: You've made a lot of requests, try again a bit later!
+  empty_message: "I didn't see a message: try replying to one using `!tr {language_code}`"
+  unknown_message: "I don't recognise language '{language_code}', sorry!"
 openai:
   api_key:
   model: gpt-3.5-turbo

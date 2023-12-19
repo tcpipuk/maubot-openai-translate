@@ -1,26 +1,38 @@
 # OpenAI Translate Maubot Plugin
 
-A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin that uses OpenAI's GPT models to provide quick and accurate translations in a more natural style than traditional translation services.
+A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin using OpenAI's GPT models for quick and accurate translations in [Matrix](https://matrix.org/docs/chat_basics/matrix-for-im/) chat rooms.
+
+OpenAI's GPT models incur a cost for queries, however even the cheapest models can excel at translation. It not only replicates the tone and style of the original text, but also attempts to understand the context, so the translation more accurately maintains the spirit of the original too.
 
 ## Usage Instructions
 
 - **Direct Translation:** Use `!tr <language_code> <message>` to translate a specific message.
-  - Example: `!tr fr Hello World` will translate "Hello World" into French.
+  - Example: `!tr fr Hello World` translates "Hello World" into French.
 - **Reply Translation:** Reply to an existing message with `!tr <language_code>`, and the bot will reply to the same message in the chosen language.
-  - Example: Replying with `!tr de` to a message will translate it into German.
+  - Example: Replying with `!tr de` to a message translates it into German.
 
 ## Supported Languages
 
-A comprehensive list of supported languages and their respective ISO 639-1 two-letter codes can be found in the `languages.py` file. This includes widely spoken languages like English, Spanish, French, as well as less commonly used languages, providing broad accessibility.
+The plugin supports a wide array of languages, listed in the `languages.py` file with their respective ISO 639-1 two-letter codes. This expansive list includes commonly spoken languages like English, Spanish, French, as well as lesser-known ones, and you could customise to additional custom ones if required.
 
 ## Configuration and Setup
 
 - **Prerequisites:** An active OpenAI API token is required for the bot's operation.
-- **Configuration:** Enter your OpenAI credentials in the Instance tab in Maubot and tweak the other OpenAI values according to your needs.
-- **Deployment:** Deploy the bot in your Matrix rooms to start enjoying seamless translation services.
+- **Configuration:** Enter your OpenAI credentials and configure bot settings in the Maubot instance tab. The settings include:
+  - `openai.api_key`: Your unique API key for accessing OpenAI's services.
+  - `openai.model`: Specifies the GPT model for translations. Default is `gpt-3.5-turbo`.
+  - `openai.max_tokens`: Sets the maximum number of tokens (words/pieces of words) for each translation response.
+  - `openai.temperature`: Determines the 'creativity' level of translations. A lower temperature, like the default 0.4, provides more literal translations.
+  - `openai.prompt`: The system prompt sent to OpenAI, instructing the model for translation tasks.
+  - `bot.rate_limit`: The maximum number of translations a user can request per hour. Zero disables the limit.
+  - `bot.rate_window`: The time frame, in seconds, for the rate limit (default is 3600 seconds, i.e., 1 hour).
+  - `bot.rate_message`: The message displayed when a user exceeds the rate limit. Leaving it blank disables this message.
+  - `bot.empty_message`: Custom message displayed when the bot receives a command without a message to translate.
+  - `bot.unknown_message`: Message displayed when a user requests translation in an unrecognized language code.
+- **Deployment:** Deploy the bot in your Matrix rooms for seamless translation services.
 
-**Note: OpenAI's API costs money. Make sure to set a spending limit in your OpenAI account, and monitor usage to avoid any surprises.**
+**Note: OpenAI's API incurs costs. It's recommended to set a spending limit in your OpenAI account and monitor usage to manage expenses effectively.**
 
 ## License
 
-The OpenAI Translate Maubot is distributed under the AGPLv3 license. Please refer to the `LICENSE` file for detailed licensing information.
+The OpenAI Translate Maubot is distributed under the AGPLv3 license. For detailed licensing information, please refer to the `LICENSE` file.

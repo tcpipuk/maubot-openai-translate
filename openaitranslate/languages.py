@@ -56,6 +56,7 @@ LANGUAGES = {
     "en-cockney": "Cockney English",
     "en-gb": "British English",
     "en-in": "Indian English",
+    "en-scouse": "Scouse English",
     "en-us": "American English",
     "en-za": "South African English",
     "eo": "Esperanto",

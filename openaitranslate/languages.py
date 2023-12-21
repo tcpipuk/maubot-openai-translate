@@ -139,6 +139,7 @@ LANGUAGES = {
     "na": "Nauru",
     "nb": "Norwegian Bokmål",
     "nd": "North Ndebele",
+    "nds": "Low German (Plattdütsch)",
     "ne": "Nepali",
     "ng": "Ndonga",
     "nl": "Dutch",

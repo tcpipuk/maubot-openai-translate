@@ -53,6 +53,7 @@ LANGUAGES = {
     "en": "English",
     "en-au": "Australian English",
     "en-ca": "Canadian English",
+    "en-cockney": "Cockney English",
     "en-gb": "British English",
     "en-in": "Indian English",
     "en-us": "American English",

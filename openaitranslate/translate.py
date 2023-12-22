@@ -23,36 +23,48 @@ from .languages import LANGUAGES
 
 class Config(BaseProxyConfig):
     """
-    Extends the BaseProxyConfig from the Maubot framework to manage the configuration settings
-    for the OpenAITranslate plugin. Uses the config parameters from the 'base-config.yaml' file.
+    Configuration manager for the OpenAITranslate plugin, extending BaseProxyConfig.
+
+    Manages the configuration settings used by the OpenAITranslate plugin, the parameters are read
+    from the 'base-config.yaml' file and control the behavior of the translation bot.
 
     Configuration Parameters:
-        bot.rate_limit (int): Limit on translations each user can do per hour, zero disables limit.
-        bot.rate_window (int): Seconds to ratelimit over, default 3600 for 1 hour.
-        bot.rate_message (str): Message to reply with when limit exceeded (blank means no reply)
+        bot.rate_limit (int): Limit on translation requests per rate_window. Zero disables limit.
+        bot.rate_window (int): Duration of rate limit measurement. Default 3600 seconds (1 hour).
+        bot.rate_message (str): Reply message when user exceeds the rate limit. Blank sends nothing.
+        bot.empty_message (str): Reply message when a request is received with nothing to translate.
+        bot.unknown_message (str): Reply when an unrecognised language code is used.
+        languages.replace_list (bool): Whether to replace default language list with codes below or
+                                       just update the language with new/updated ones.
+        languages.codes (dict): Custom language codes and names to extend/replace language list.
         openai.api_key (str): The API key for accessing OpenAI's services.
-        openai.model (str): Specifies model of GPT (e.g., gpt-3.5-turbo) to use for translations.
-        openai.max_tokens (int): Provides an upper limit for translation length by setting the
-                                 maximum number of tokens (words/pieces of words) in each response.
-        openai.temperature (float): Sets 'creativity' temperature for translation, which should be
-                                    low for a normal translation.
-        openai.prompt (str): System prompt sent to OpenAI, tells the model what to do with the text.
+        openai.model (str): Which OpenAI GPT model to use for requests. Default is gpt-3.5-turbo.
+        openai.max_tokens (int): Maximum number of tokens (pieces of words) for OpenAI responses.
+        openai.temperature (float): The 'creativity' of translations, lower values are more literal.
+        openai.prompt (str): System prompt sent to OpenAI, instructing the model for translation.
+        openai.custom_endpoint (str): URL of OpenAI chat completions similar API. Blank uses OpenAI.
 
     Methods:
-        do_update(helper: ConfigUpdateHelper): Updates config parameters from the Maubot interface.
+        do_update(helper: ConfigUpdateHelper): Updates the configuration parameters from the
+                                               Maubot interface when changes are made.
+
+    Note: This class relies on the BaseProxyConfig from the Maubot framework for base functionality.
     """
 
     def do_update(self, helper: ConfigUpdateHelper) -> None:
-        helper.copy("bot.rate_limit")
-        helper.copy("bot.rate_window")
-        helper.copy("bot.rate_message")
-        helper.copy("bot.empty_message")
-        helper.copy("bot.unknown_message")
         helper.copy("openai.api_key")
         helper.copy("openai.model")
         helper.copy("openai.max_tokens")
         helper.copy("openai.temperature")
         helper.copy("openai.prompt")
+        helper.copy("openai.custom_endpoint")
+        helper.copy("bot.rate_limit")
+        helper.copy("bot.rate_window")
+        helper.copy("bot.rate_message")
+        helper.copy("bot.empty_message")
+        helper.copy("bot.unknown_message")
+        helper.copy("languages.replace_list")
+        helper.copy("languages.codes")
 
 
 class OpenAITranslate(Plugin):
@@ -68,6 +80,7 @@ class OpenAITranslate(Plugin):
         user_translations (dict): Dict of timestamps of translations for rate limiting.
     """
 
+    languages = {}
     user_translations = {}
 
     async def start(self) -> None:
@@ -88,6 +101,8 @@ class OpenAITranslate(Plugin):
             self.log.error("OpenAI API token is not configured.")
             await self.stop()
             return
+        # Update language list as needed from the config
+        self.update_language_list()
 
     @command.new(name="tr", help="Translate a message. Usage: !tr <language_code> <message>")
     @command.argument("args", pass_raw=True, required=True)
@@ -106,10 +121,12 @@ class OpenAITranslate(Plugin):
             None: Responds directly to the Matrix room with the translated message or error message.
         """
         reply_config = {"markdown": True, "reply": True}
+        # Update language list
+        self.update_language_list()
         # Identify language
         parts = args.split(" ", 1)
         language_code, message = parts[0], parts[1] if len(parts) > 1 else None
-        language_name = LANGUAGES.get(language_code.lower())
+        language_name = self.languages.get(language_code.lower())
         if not language_name:
             await evt.respond(
                 self.config["bot.unknown_message"].format(language_code=language_code),
@@ -141,6 +158,23 @@ class OpenAITranslate(Plugin):
                 self.config["bot.empty_message"].format(language_code=language_code), **reply_config
             )
         return
+
+    def update_language_list(self):
+        """
+        Updates the language list based on the current configuration.
+
+        Clears the self.languages dictionary and repopulates it from LANGUAGES. Starts with the
+        original language list and then, if the `languages.replace_list` config is not True, updates
+        with extra/updated language codes specified in the `languages.codes` config.
+        """
+        if self.config["languages.replace_list"]:
+            self.log.info("Replacing language list!")
+            self.languages.clear()
+        else:
+            self.log.info("Updating existing language list!")
+            self.languages = LANGUAGES.copy()
+        self.languages.update(self.config["languages.codes"])
+        self.log.info("Language list has been updated!")
 
     async def check_limit(self, user_id: str) -> bool:
         """
@@ -229,7 +263,9 @@ class OpenAITranslate(Plugin):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    "https://api.openai.com/v1/chat/completions",
+                    self.config["openai.custom_endpoint"]
+                    if self.config["openai.custom_endpoint"]
+                    else "https://api.openai.com/v1/chat/completions",
                     headers=headers,
                     data=json.dumps(payload),
                 ) as resp:

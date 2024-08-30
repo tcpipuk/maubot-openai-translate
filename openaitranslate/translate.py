@@ -48,8 +48,6 @@ class Config(BaseProxyConfig):
     Methods:
         do_update(helper: ConfigUpdateHelper): Updates the configuration parameters from the
                                                Maubot interface when changes are made.
-
-    Note: This class relies on the BaseProxyConfig from the Maubot framework for base functionality.
     """
 
     def do_update(self, helper: ConfigUpdateHelper) -> None:
@@ -130,21 +128,21 @@ class OpenAITranslate(Plugin):
         language_name = self.languages.get(language_code.lower())
         if not language_name:
             await evt.respond(
-                self.config["bot.unknown_message"].format(language_code=language_code),
-                **reply_config,
+                self.config["bot.unknown_message"].format(language_code=language_code),  # type:ignore
+                **reply_config,  # type:ignore
             )
             return
         # Handle commands that were replying to other messages
-        if not message and evt.content.get_reply_to():
-            reply_evt = await self.client.get_event(evt.room_id, evt.content.get_reply_to())
+        if not message and evt.content.get_reply_to():  # type:ignore
+            reply_evt = await self.client.get_event(evt.room_id, evt.content.get_reply_to())  # type:ignore
             message = reply_evt.content.body
         else:
             reply_evt = False
         # Handle translation replying to original message
         if message:
             if not await self.check_limit(evt.sender):
-                if self.config["bot.rate_message"]:
-                    await evt.respond(str(self.config["bot.rate_message"]), **reply_config)
+                if self.config["bot.rate_message"]:  # type:ignore
+                    await evt.respond(str(self.config["bot.rate_message"]), **reply_config)  # type:ignore
             else:
                 translation = await self.translate_with_openai(message, language_name)
                 if reply_evt:
@@ -152,11 +150,12 @@ class OpenAITranslate(Plugin):
                         f"{language_code.upper()}: {translation}", **reply_config
                     )
                 else:
-                    await evt.respond(translation, **reply_config)
+                    await evt.respond(translation, **reply_config)  # type:ignore
         # Warn when nothing to translate
         else:
             await evt.respond(
-                self.config["bot.empty_message"].format(language_code=language_code), **reply_config
+                self.config["bot.empty_message"].format(language_code=language_code),  # type:ignore
+                **reply_config,  # type:ignore
             )
         return
 
@@ -168,13 +167,13 @@ class OpenAITranslate(Plugin):
         original language list and then, if the `languages.replace_list` config is not True, updates
         with extra/updated language codes specified in the `languages.codes` config.
         """
-        if self.config["languages.replace_list"]:
+        if self.config["languages.replace_list"]:  # type:ignore
             self.log.info("Replacing language list!")
             self.languages.clear()
         else:
             self.log.info("Updating existing language list!")
             self.languages = LANGUAGES.copy()
-        self.languages.update(self.config["languages.codes"])
+        self.languages.update(self.config["languages.codes"])  # type:ignore
         self.log.info("Language list has been updated!")
 
     async def check_limit(self, user_id: str) -> bool:
@@ -204,20 +203,20 @@ class OpenAITranslate(Plugin):
             user: [
                 t
                 for t in times
-                if current_time - t < timedelta(seconds=self.config["bot.rate_window"])
+                if current_time - t < timedelta(seconds=self.config["bot.rate_window"])  # type:ignore
             ]
             for user, times in self.user_translations.items()
             if times  # Keep users who have made translations
         }
         # Skip processing if no rate limit
-        if int(self.config["bot.rate_limit"]) == 0:
+        if int(self.config["bot.rate_limit"]) == 0:  # type:ignore
             return True
         # Create entry if this user not seen before
         if user_id not in self.user_translations:
             self.user_translations[user_id] = [current_time]
             return True
         # Add new timestmap for user if already exists
-        if len(self.user_translations[user_id]) < int(self.config["bot.rate_limit"]):
+        if len(self.user_translations[user_id]) < int(self.config["bot.rate_limit"]):  # type:ignore
             self.user_translations[user_id].append(current_time)
             return True
         # Failed ratelimit check

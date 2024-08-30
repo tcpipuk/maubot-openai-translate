@@ -7,6 +7,7 @@ human-readable language names for display and API interaction purposes.
 
 Note: Ensure that the language codes are in lowercase!
 """
+
 LANGUAGES = {
     "aa": "Afar",
     "ab": "Abkhaz",

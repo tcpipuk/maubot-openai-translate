@@ -10,6 +10,7 @@ Dependencies:
 - maubot: For plugin and command handling within the Maubot framework.
 - mautrix: For types and utilities related to the Matrix protocol.
 """
+
 from typing import Type
 from datetime import datetime, timedelta
 import json

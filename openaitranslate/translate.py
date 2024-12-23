@@ -13,11 +13,14 @@ Dependencies:
 
 from __future__ import annotations
 
-import json
-from datetime import datetime, timedelta, timezone
+import time
+from asyncio import TimeoutError as AsyncioTimeoutError
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-import aiohttp
+from aiohttp.client import ClientError as AiohttpClientError
+from aiohttp.client import ClientSession as AiohttpClientSession
+from aiohttp.client import ClientTimeout as AiohttpClientTimeout
 from maubot.handlers import command
 from maubot.plugin_base import Plugin
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
@@ -27,6 +30,14 @@ from .languages import LANGUAGES
 if TYPE_CHECKING:
     from maubot.matrix import MaubotMatrixClient as MatrixClient
     from maubot.matrix import MaubotMessageEvent as MessageEvent
+
+
+ERR_NO_AUTH = "API token has not been configured"
+ERR_NOT_CONFIGURED = "Plugin must be configured before use"
+ERR_NOT_INIT = "Translation service not initialised"
+
+HTTP_TOO_MANY_REQUESTS = 429
+HTTP_UNAUTHORIZED = 401
 
 
 class Config(BaseProxyConfig):
@@ -100,28 +111,43 @@ class OpenAITranslate(Plugin):
         """
         super().__init__(*args, client=client, **kwargs)
         self.languages: dict[str, str] = {}
-        self.user_translations: dict[str, list[datetime]] = {}
+        self.user_translations: defaultdict[str, list[float]] = defaultdict(list)
+        self._session: AiohttpClientSession | None = None
 
     async def start(self) -> None:
         """
         Initialise the plugin and load configuration.
 
         Validates the OpenAI API token and logs warnings if not properly configured.
+
+        Raises:
+            RuntimeError: If plugin is not configured or API token is missing
+            TypeError: If config is not of the correct type
         """
         await super().start()
-        # Check if config exists
         if not isinstance(self.config, Config):
-            self.log.error("Plugin must be configured before use.")
-            await self.stop()
-            return
-        # Load in config and check for API key
+            raise TypeError(ERR_NOT_CONFIGURED)
+
         self.config.load_and_update()
         if not self.config["openai.api_key"]:
-            self.log.error("OpenAI API token is not configured.")
-            await self.stop()
-            return
-        # Update language list as needed from the config
+            raise RuntimeError(ERR_NO_AUTH)
+
+        if not self._session:
+            self._session = AiohttpClientSession(
+                timeout=AiohttpClientTimeout(total=30),
+                headers={
+                    "Authorization": f"Bearer {self.config['openai.api_key']}",
+                    "Content-Type": "application/json",
+                },
+            )
         self.update_language_list()
+
+    async def stop(self) -> None:
+        """Clean up resources when stopping plugin."""
+        if self._session:
+            await self._session.close()
+            self._session = None
+        await super().stop()
 
     @command.new(name="tr", help="Translate a message. Usage: !tr <language_code> <message>")
     @command.argument("args", pass_raw=True, required=True)
@@ -201,39 +227,21 @@ class OpenAITranslate(Plugin):
         Manages rate limiting by tracking the time of each user's translation requests over a
         specified time window, defined in the bot's configuration.
 
-        Maintains dictionary (`user_translations`) where each key is a user ID, and value is a list
-        of timestamps representing their translation requests. It removes timestamps outside the
-        current rate limit window and checks if the number of requests is within the allowed limit.
-        If the user has not exceeded the limit, their new request timestamp is added to the list.
-
-        Args:
-            user_id (str): The Matrix user ID to check
-
         Returns:
-            bool: True if translation is allowed, False if rate limited
-
-        Note: When the rate limiting is set to zero in the config, this always returns True.
+            bool: True if user is within rate limit, False if limit exceeded
         """
-        current_time = datetime.now(timezone.utc)
-        # Remove expired entries before counting ratelimit
-        self.user_translations = {
-            user: [
-                t
-                for t in times
-                if current_time - t < timedelta(seconds=self.config["bot.rate_window"])  # type:ignore
-            ]
-            for user, times in self.user_translations.items()
-            if times  # Keep users who have made translations
-        }
-        # Skip processing if no rate limit
-        if int(self.config["bot.rate_limit"]) == 0:  # type:ignore
+        rate_limit = int(self.config["bot.rate_limit"])  # type: ignore
+        if rate_limit == 0:
             return True
-        # Create entry if this user not seen before
-        if user_id not in self.user_translations:
-            self.user_translations[user_id] = [current_time]
-            return True
-        # Add new timestmap for user if already exists
-        if len(self.user_translations[user_id]) < int(self.config["bot.rate_limit"]):  # type:ignore
+
+        current_time = time.time()
+        window = float(self.config["bot.rate_window"])  # type: ignore
+        cutoff = current_time - window
+
+        # Filter old timestamps and check count in one pass
+        self.user_translations[user_id] = [t for t in self.user_translations[user_id] if t > cutoff]
+
+        if len(self.user_translations[user_id]) < rate_limit:
             self.user_translations[user_id].append(current_time)
             return True
         # Failed ratelimit check
@@ -252,48 +260,59 @@ class OpenAITranslate(Plugin):
 
         Returns:
             str: Translated text or error message if request fails
+
+        Raises:
+            RuntimeError: If translation service is not initialised
         """
-        if not self.config:
-            return "Sorry, I'm not configured yet!"
-        # Build request
-        headers = {
-            "Authorization": f"Bearer {self.config['openai.api_key']}",
-            "Content-Type": "application/json",
-        }
+        if not self._session:
+            raise RuntimeError(ERR_NOT_INIT)
+
         payload = {
-            "model": self.config["openai.model"],
+            "model": self.config["openai.model"],  # type: ignore
             "messages": [
                 {
                     "role": "system",
-                    "content": self.config["openai.prompt"].format(language=language),
+                    "content": self.config["openai.prompt"].format(language=language),  # type: ignore
                 },
                 {"role": "user", "content": text},
             ],
-            "temperature": self.config["openai.temperature"],
-            "max_tokens": self.config["openai.max_tokens"],
+            "temperature": self.config["openai.temperature"],  # type: ignore
+            "max_tokens": self.config["openai.max_tokens"],  # type: ignore
             "top_p": 1,
             "frequency_penalty": 0,
             "presence_penalty": 0,
         }
-        # Send request to OpenAI
+
         try:
-            async with aiohttp.ClientSession() as session, session.post(
-                self.config["openai.custom_endpoint"]
+            async with self._session.post(
+                self.config["openai.custom_endpoint"]  # type: ignore
                 or "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                data=json.dumps(payload),
+                json=payload,
             ) as resp:
                 if resp.ok:
                     data = await resp.json()
                     return (
                         data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
                     )
-                # Handle errors
-                self.log.error("OpenAI API request failed with status %s", resp.status)
-                return "Failed to translate the message."
-        except Exception:
-            self.log.exception("Error during translation")
-            return "Failed to translate the message due to an error."
+
+                error_text = await resp.text()
+                self.log.error(
+                    "OpenAI API request failed with status %s: %s",
+                    resp.status,
+                    error_text,
+                )
+                if resp.status == HTTP_TOO_MANY_REQUESTS:
+                    return self.config["bot.bot_rate_message"].format(error=error_text)  # type: ignore
+                if resp.status == HTTP_UNAUTHORIZED:
+                    return self.config["bot.auth_message"].format(error=error_text)  # type: ignore
+                return self.config["bot.unexpected_message"].format(error=error_text)  # type: ignore
+        # Handle errors
+        except (AsyncioTimeoutError, AiohttpClientError) as e:
+            self.log.exception("Network error during translation")
+            return self.config["bot.network_message"].format(error=str(e))  # type: ignore
+        except Exception as e:
+            self.log.exception("Unexpected error during translation")
+            return self.config["bot.unexpected_message"].format(error=str(e))  # type: ignore
 
     @classmethod
     def get_config_class(cls) -> type[BaseProxyConfig]:

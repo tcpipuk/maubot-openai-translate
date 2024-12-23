@@ -16,9 +16,15 @@ openai:
 bot:
   rate_limit: 5
   rate_window: 3600
+  # User request errors
   rate_message: You've made a lot of requests, try again a bit later!
   empty_message: "I didn't see a message: try replying to one using `!tr {language_code}`"
   unknown_message: I don't recognise language '{language_code}', sorry!
+  # Translation service errors
+  auth_message: "I'm sorry, I can't authenticate with the translation service: {error}"
+  bot_rate_message: "I'm sorry, I've exceeded my rate limit, please try again in a minute: {error}"
+  network_message: "I'm sorry, translation failed due to network error: {error}"
+  unexpected_message: "I'm sorry, translation failed due to an unexpected error: {error}"
 languages:
   replace_list: false
   codes:

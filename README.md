@@ -7,13 +7,25 @@
 5. [Configuration](#configuration)
 6. [License](#license)
 
-A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin using OpenAI's GPT models for
-quick and accurate translations in [Matrix](https://matrix.org/docs/chat_basics/matrix-for-im/)
+A (fairly) simple [Maubot](https://github.com/maubot/maubot) plugin that uses Large Language Models
+for quick and accurate translations in [Matrix](https://matrix.org/docs/chat_basics/matrix-for-im/)
 chat rooms.
 
-OpenAI's GPT models incur a cost for queries, however even the cheapest models can excel at
-translation. They not only replicate the tone and style of the original text but also attempt to
-understand the context, so the translation more accurately maintains the spirit of the original.
+Modern LLMs excel at translation tasks, as they not only replicate the tone and style of the
+original text but also attempt to understand the context, helping maintain the spirit of the
+original message.
+
+The plugin _should_ work with any service offering an OpenAI-compatible Chat Completions API,
+including:
+
+- OpenAI's own GPT models (the default configuration)
+- Self-hosted solutions (e.g. [LocalAI](https://localai.io/))
+- Alternative providers (e.g. [Claude](https://docs.anthropic.com/claude/docs/getting-started-with-claude)
+  or [Azure OpenAI](https://learn.microsoft.com/en-us/azure/ai-services/openai/reference))
+
+**Note:** If you do not self-host an LLM, you will likely be charged for the use of the LLM API.
+Suggested models like `gpt-4o-mini` are very cheap, but these costs can add up if you make your bot
+public, inviteable in rooms, and/or don't set rate limits.
 
 ## Usage Instructions
 
@@ -64,9 +76,11 @@ Enter your OpenAI credentials and configure bot settings in the Maubot instance 
   or just add/update the list with your changes.
 - `openai.api_key`: Your unique API key for accessing OpenAI's services.
 - `openai.custom_endpoint`: If you want to use another OpenAI Chat Completions compatible API,
-  provide the full URL here, otherwise leave blank to use
-  `https://api.openai.com/v1/chat/completions`.
-- `openai.model`: Specifies the GPT model for translations. Default is `gpt-4o-mini`.
+  provide the full URL here (e.g. `http://localhost:8080/v1/chat/completions` for LocalAI),
+  otherwise leave blank to use `https://api.openai.com/v1/chat/completions`.
+- `openai.model`: Specifies the GPT model for translations. Default is `gpt-4o-mini`, but you
+  should set this to match your chosen provider's model names (e.g. `gpt-3.5-turbo` for OpenAI,
+  or `ggml-gpt4all-j` for LocalAI).
 - `openai.max_tokens`: Sets the maximum number of tokens (words/pieces of words) for each
   translation response.
 - `openai.temperature`: Determines the 'creativity' level of translations. The default (0.4)
@@ -74,8 +88,9 @@ Enter your OpenAI credentials and configure bot settings in the Maubot instance 
   but also more robotic.
 - `openai.prompt`: The system prompt sent to OpenAI, instructing the model for translation tasks.
 
-**Note:** OpenAI's API incurs costs. It's recommended to set a spending limit in your OpenAI
-account and monitor usage to manage expenses effectively.
+**Note:** While OpenAI's API incurs costs, you can use alternative providers like LocalAI to run
+models locally or choose other commercial providers. It's still recommended to set appropriate
+rate limits to manage resource usage effectively.
 
 ## License
 

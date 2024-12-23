@@ -1,10 +1,10 @@
 maubot: 0.1.0
 id: uk.tcpip.openaitranslate
-version: 0.3.1
+version: 0.4.0
 license: AGPL-3.0-or-later
 modules:
-    - openaitranslate
+  - openaitranslate
 main_class: OpenAITranslate
 config: true
 extra_files:
-    - base-config.yaml
+  - base-config.yaml

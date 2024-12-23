@@ -1,9 +1,7 @@
 """
-This file contains a dictionary that maps ISO 639-1 two-letter language codes to their
-corresponding full language names.
+Define ISO 639-1 two-letter language codes and their full language names.
 
-This mapping is used by the OpenAITranslate Maubot plugin to translate language codes into
-human-readable language names for display and API interaction purposes.
+Maps language codes to human-readable names for display and API interaction purposes.
 
 Note: Ensure that the language codes are in lowercase!
 """
@@ -36,6 +34,7 @@ LANGUAGES = {
     "ca": "Catalan",
     "ce": "Chechen",
     "ch": "Chamorro",
+    "cmn": "Mandarin Chinese",
     "co": "Corsican",
     "cr": "Cree",
     "cs": "Czech",
@@ -56,13 +55,17 @@ LANGUAGES = {
     "en-ca": "Canadian English",
     "en-gb": "British English",
     "en-in": "Indian English",
+    "en-nz": "New Zealand English",
     "en-us": "American English",
     "en-za": "South African English",
     "eo": "Esperanto",
     "es": "Spanish",
     "es-ar": "Argentinian Spanish",
+    "es-cl": "Chilean Spanish",
+    "es-co": "Colombian Spanish",
     "es-es": "European Spanish",
     "es-mx": "Mexican Spanish",
+    "es-pe": "Peruvian Spanish",
     "et": "Estonian",
     "eu": "Basque",
     "fa": "Persian",
@@ -71,7 +74,9 @@ LANGUAGES = {
     "fj": "Fijian",
     "fo": "Faroese",
     "fr": "French",
+    "fr-be": "Belgian French",
     "fr-ca": "Canadian French",
+    "fr-ch": "Swiss French",
     "fr-fr": "European French",
     "fy": "Western Frisian",
     "ga": "Irish",
@@ -161,6 +166,7 @@ LANGUAGES = {
     "pl": "Polish",
     "ps": "Pashto",
     "pt": "Portuguese",
+    "pt-ao": "Angolan Portuguese",
     "pt-br": "Brazillian Portuguese",
     "pt-pt": "European Portuguese",
     "qu": "Quechua",
@@ -168,6 +174,7 @@ LANGUAGES = {
     "rn": "Kirundi",
     "ro": "Romanian",
     "ru": "Russian",
+    "ru-by": "Belarusian Russian",
     "rw": "Kinyarwanda",
     "sa": "Sanskrit",
     "sc": "Sardinian",
@@ -182,6 +189,8 @@ LANGUAGES = {
     "so": "Somali",
     "sq": "Albanian",
     "sr": "Serbian",
+    "sr-cyrl": "Serbian (Cyrillic script)",
+    "sr-latn": "Serbian (Latin script)",
     "ss": "Swati",
     "st": "Southern Sotho",
     "su": "Sundanese",
@@ -216,6 +225,8 @@ LANGUAGES = {
     "za": "Zhuang",
     "zh": "Chinese",
     "zh-cn": "Simplified Chinese",
+    "zh-hk": "Hong Kong Chinese",
+    "zh-sg": "Singaporean Chinese",
     "zh-tw": "Traditional Chinese",
     "zu": "Zulu",
 }

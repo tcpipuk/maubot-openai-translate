@@ -1,56 +1,65 @@
 """
-Maubot plugin to handle translation commands using the OpenAI API.
+Translate messages using the OpenAI API (or compatible alternatives) in Matrix chat rooms.
 
-This module defines the OpenAITranslate class, which integrates with OpenAI's language model to
-provide translation services within Matrix chat rooms. It handles command parsing, translation
-requests to the OpenAI API, and responding to user messages with translated text.
+This module provides a Maubot plugin that integrates with OpenAI's language models to offer
+translation services. It processes commands, sends translation requests to the OpenAI API,
+and responds in Matrix rooms.
 
 Dependencies:
-- aiohttp: For making asynchronous HTTP requests to the OpenAI API.
-- maubot: For plugin and command handling within the Maubot framework.
-- mautrix: For types and utilities related to the Matrix protocol.
+    aiohttp: For asynchronous HTTP requests to the OpenAI API
+    maubot: For plugin and command handling
+    mautrix: For Matrix protocol types and utilities
 """
 
-from typing import Type
-from datetime import datetime, timedelta
+from __future__ import annotations
+
 import json
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
+
 import aiohttp
-from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
-from maubot.matrix import MaubotMessageEvent as MessageEvent
-from maubot.plugin_base import Plugin
 from maubot.handlers import command
+from maubot.plugin_base import Plugin
+from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
+
 from .languages import LANGUAGES
+
+if TYPE_CHECKING:
+    from maubot.matrix import MaubotMatrixClient as MatrixClient
+    from maubot.matrix import MaubotMessageEvent as MessageEvent
 
 
 class Config(BaseProxyConfig):
     """
-    Configuration manager for the OpenAITranslate plugin, extending BaseProxyConfig.
+    Manage configuration for the OpenAITranslate plugin.
 
     Manages the configuration settings used by the OpenAITranslate plugin, the parameters are read
     from the 'base-config.yaml' file and control the behavior of the translation bot.
 
-    Configuration Parameters:
-        bot.rate_limit (int): Limit on translation requests per rate_window. Zero disables limit.
-        bot.rate_window (int): Duration of rate limit measurement. Default 3600 seconds (1 hour).
-        bot.rate_message (str): Reply message when user exceeds the rate limit. Blank sends nothing.
-        bot.empty_message (str): Reply message when a request is received with nothing to translate.
-        bot.unknown_message (str): Reply when an unrecognised language code is used.
-        languages.replace_list (bool): Whether to replace default language list with codes below or
-                                       just update the language with new/updated ones.
-        languages.codes (dict): Custom language codes and names to extend/replace language list.
-        openai.api_key (str): The API key for accessing OpenAI's services.
-        openai.model (str): Which OpenAI GPT model to use for requests. Default is gpt-3.5-turbo.
-        openai.max_tokens (int): Maximum number of tokens (pieces of words) for OpenAI responses.
-        openai.temperature (float): The 'creativity' of translations, lower values are more literal.
-        openai.prompt (str): System prompt sent to OpenAI, instructing the model for translation.
-        openai.custom_endpoint (str): URL of OpenAI chat completions similar API. Blank uses OpenAI.
-
-    Methods:
-        do_update(helper: ConfigUpdateHelper): Updates the configuration parameters from the
-                                               Maubot interface when changes are made.
+    Attributes:
+        bot.rate_limit (int): Maximum translation requests per rate window (0 disables limit)
+        bot.rate_window (int): Duration in seconds for rate limiting (default: 3600)
+        bot.rate_message (str): Response when user exceeds rate limit (blank sends nothing)
+        bot.empty_message (str): Response when request has no text to translate
+        bot.unknown_message (str): Response for unrecognised language codes
+        languages.replace_list (bool): Whether to replace or update the default language list
+        languages.codes (dict): Custom language codes and names
+        openai.api_key (str): OpenAI API authentication key
+        openai.model (str): GPT model to use (default: gpt-3.5-turbo)
+        openai.max_tokens (int): Maximum token limit for responses
+        openai.temperature (float): Translation creativity level (lower is more literal)
+        openai.prompt (str): System prompt for translation instructions
+        openai.custom_endpoint (str): Alternative API endpoint URL (blank uses OpenAI)
     """
 
-    def do_update(self, helper: ConfigUpdateHelper) -> None:
+    @staticmethod
+    def do_update(helper: ConfigUpdateHelper) -> None:
+        """
+        Update configuration from base config.
+
+        Args:
+            helper (ConfigUpdateHelper): Helper to copy config values
+        """
         helper.copy("openai.api_key")
         helper.copy("openai.model")
         helper.copy("openai.max_tokens")
@@ -68,25 +77,36 @@ class Config(BaseProxyConfig):
 
 class OpenAITranslate(Plugin):
     """
-    A plugin for translating messages in Matrix rooms using OpenAI's language models.
+    Translate messages in Matrix rooms using OpenAI's language models.
 
-    This class extends the Maubot Plugin class and handles the initialization and command
+    This class extends the Maubot Plugin class and handles the initialisation and command
     processing required to translate messages. It interacts with the OpenAI API to perform
     the translations and responds directly in the Matrix chat rooms.
 
     Attributes:
-        config (Config): A configuration object holding API keys and settings.
-        user_translations (dict): Dict of timestamps of translations for rate limiting.
+        config (Config): API keys and settings
+        user_translations (dict): Translation timestamps for rate limiting
+        languages (dict): Available language codes and names
     """
 
-    languages = {}
-    user_translations = {}
+    def __init__(self, *args: Any, client: MatrixClient, **kwargs: Any) -> None:
+        """
+        Initialise the OpenAITranslate plugin.
+
+        Args:
+            client: The Matrix client instance
+            *args: Variable length argument list
+            **kwargs: Arbitrary keyword arguments
+        """
+        super().__init__(*args, client=client, **kwargs)
+        self.languages: dict[str, str] = {}
+        self.user_translations: dict[str, list[datetime]] = {}
 
     async def start(self) -> None:
         """
-        Initializes the plugin by loading the configuration.
+        Initialise the plugin and load configuration.
 
-        Ensures that the OpenAI API token is configured. Logs a warning if not.
+        Validates the OpenAI API token and logs warnings if not properly configured.
         """
         await super().start()
         # Check if config exists
@@ -107,17 +127,14 @@ class OpenAITranslate(Plugin):
     @command.argument("args", pass_raw=True, required=True)
     async def tr(self, evt: MessageEvent, args: str) -> None:
         """
-        Handles the '!tr' command to translate a message in a Matrix room.
+        Process translation commands in Matrix rooms.
 
-        This method is triggered when a user sends a message starting with '!tr'. It parses
-        the message to determine the target language and the text to be translated.
+        Handles the '!tr' command by parsing the target language and text,
+        then returning the translation to the room.
 
         Args:
-            event (MessageEvent): The message event that triggered the command.
-            language (str): The language code to which the message should be translated.
-
-        Returns:
-            None: Responds directly to the Matrix room with the translated message or error message.
+            evt (MessageEvent): The triggering message event
+            args (str): The command arguments containing language code and text
         """
         reply_config = {"markdown": True, "reply": True}
         # Update language list
@@ -147,7 +164,8 @@ class OpenAITranslate(Plugin):
                 translation = await self.translate_with_openai(message, language_name)
                 if reply_evt:
                     await reply_evt.respond(
-                        f"{language_code.upper()}: {translation}", **reply_config
+                        f"{language_code.upper()}: {translation}",
+                        **reply_config,
                     )
                 else:
                     await evt.respond(translation, **reply_config)  # type:ignore
@@ -159,13 +177,13 @@ class OpenAITranslate(Plugin):
             )
         return
 
-    def update_language_list(self):
+    def update_language_list(self) -> None:
         """
-        Updates the language list based on the current configuration.
+        Update the available languages based on configuration.
 
         Clears the self.languages dictionary and repopulates it from LANGUAGES. Starts with the
-        original language list and then, if the `languages.replace_list` config is not True, updates
-        with extra/updated language codes specified in the `languages.codes` config.
+        original language list and then, if the `languages.replace_list` config is not True,
+        updates with extra/updated language codes specified in the `languages.codes` config.
         """
         if self.config["languages.replace_list"]:  # type:ignore
             self.log.info("Replacing language list!")
@@ -178,7 +196,7 @@ class OpenAITranslate(Plugin):
 
     async def check_limit(self, user_id: str) -> bool:
         """
-        Checks if a user has exceeded the rate limit for translation requests.
+        Check if a user has exceeded their translation rate limit.
 
         Manages rate limiting by tracking the time of each user's translation requests over a
         specified time window, defined in the bot's configuration.
@@ -189,15 +207,14 @@ class OpenAITranslate(Plugin):
         If the user has not exceeded the limit, their new request timestamp is added to the list.
 
         Args:
-            user_id (str): The unique identifier of the user making the translation request.
+            user_id (str): The Matrix user ID to check
 
         Returns:
-            bool: True if the user can make a translation request,
-                  False if the user has exceeded the rate limit.
+            bool: True if translation is allowed, False if rate limited
 
         Note: When the rate limiting is set to zero in the config, this always returns True.
         """
-        current_time = datetime.now()
+        current_time = datetime.now(timezone.utc)
         # Remove expired entries before counting ratelimit
         self.user_translations = {
             user: [
@@ -220,22 +237,21 @@ class OpenAITranslate(Plugin):
             self.user_translations[user_id].append(current_time)
             return True
         # Failed ratelimit check
-        else:
-            return False
+        return False
 
     async def translate_with_openai(self, text: str, language: str) -> str:
         """
-        Translates a given text into the specified language using OpenAI's API.
+        Send text to OpenAI API for translation.
 
-        Constructs the request payload and sends it to the OpenAI API, then processes
-        the response to extract the translated text.
+        Makes an API request to OpenAI with the text and desired language,
+        then processes the response.
 
         Args:
-            text (str): The text to be translated.
-            language (str): The target language code for the translation.
+            text (str): Text to translate
+            language (str): Target language name
 
         Returns:
-            str: The translated text or an error message if the API call fails.
+            str: Translated text or error message if request fails
         """
         if not self.config:
             return "Sorry, I'm not configured yet!"
@@ -261,30 +277,30 @@ class OpenAITranslate(Plugin):
         }
         # Send request to OpenAI
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.config["openai.custom_endpoint"]
-                    if self.config["openai.custom_endpoint"]
-                    else "https://api.openai.com/v1/chat/completions",
-                    headers=headers,
-                    data=json.dumps(payload),
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        responses = (
-                            data.get("choices", [{}])[0]
-                            .get("message", {})
-                            .get("content", "")
-                            .strip()
-                        )
-                        return responses
-                    else:
-                        self.log.error(f"OpenAI API request failed with status {resp.status}")
-                        return "Failed to translate the message."
-        except Exception as e:
-            self.log.error(f"Error during translation: {e}")
+            async with aiohttp.ClientSession() as session, session.post(
+                self.config["openai.custom_endpoint"]
+                or "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                data=json.dumps(payload),
+            ) as resp:
+                if resp.ok:
+                    data = await resp.json()
+                    return (
+                        data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                    )
+                # Handle errors
+                self.log.error("OpenAI API request failed with status %s", resp.status)
+                return "Failed to translate the message."
+        except Exception:
+            self.log.exception("Error during translation")
             return "Failed to translate the message due to an error."
 
     @classmethod
-    def get_config_class(cls) -> Type[BaseProxyConfig]:
+    def get_config_class(cls) -> type[BaseProxyConfig]:
+        """
+        Return the configuration class for this plugin.
+
+        Returns:
+            type[BaseProxyConfig]: The Config class for this plugin
+        """
         return Config

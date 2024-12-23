@@ -54,6 +54,10 @@ Enter your OpenAI credentials and configure bot settings in the Maubot instance 
   to translate.
 - `bot.unknown_message`: Message displayed when a user requests translation in an unrecognised
   language code.
+- `bot.auth_message`: Custom message displayed when authentication with the LLM API fails.
+- `bot.bot_rate_message`: Message shown when the bot hits the LLM API's rate limits.
+- `bot.network_message`: Message displayed when network errors occur.
+- `bot.unexpected_message`: Message shown for unexpected translation errors.
 - `languages.codes`: A list of `co-de: Language Name` options to tell the bot extra ways to
   translate (e.g. `en-cockney: Cockney English`).
 - `languages.replace_list`: Whether to replace the built-in list with the ones defined above,
